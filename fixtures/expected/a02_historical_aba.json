@@ -1,0 +1,37 @@
+{
+  "acceptance_id": "A02",
+  "profile": "EUREX-1.5",
+  "releases_oldest_first": [
+    "0.5.2-eurex15",
+    "0.5.3",
+    "0.5.4",
+    "0.5.4b",
+    "0.5.4c",
+    "0.5.4d",
+    "0.5.4e"
+  ],
+  "release_sha256": {
+    "0.5.2-eurex15": "dcf11c8b31ec9ef7e408b5201a138d50c493a964daa8f09846567ada065b937b",
+    "0.5.3": "9d8d20398f69591eeb0ad58f62ca274c6ed66a790081fe667bbf2ea182950ca3",
+    "0.5.4": "b1797ae248e5dbc442ed62580edcc4d86c97c089c674eed5ab2b2c6b2c28eaad",
+    "0.5.4b": "332a7a92e6dd0387f5dec31da24ca0ccc2edf4db7eafadbe63f2f0cd1f0367ef",
+    "0.5.4c": "239f0ade9fd8bc18cfafbea373d8a5930a4a848263bd929201df8acffbeecdca",
+    "0.5.4d": "35ed165a3367bc523083b5604858422492358a6410e6fdf3dad5acf49c292e61",
+    "0.5.4e": "43ee024e4486a99021e3c86edb3b6e0c37758c87574dffceca0675850926f656"
+  },
+  "entry_counts": {
+    "0.5.2-eurex15": 445,
+    "0.5.3": 465,
+    "0.5.4": 480,
+    "0.5.4b": 480,
+    "0.5.4c": 480,
+    "0.5.4d": 480,
+    "0.5.4e": 482
+  },
+  "aba_count": 0,
+  "aba_hits": [],
+  "algorithm": "ARCHITECTURE.md 4.5 / history.find_aba: per casefolded path over releases that contain it (absent skipped); flag n when sha[n] != sha[n-1] and some k < n-1 has sha[k] == sha[n].",
+  "computed_by": "throwaway script aba_count.py in the session scratchpad (not shipped), python -I, stdlib zipfile+hashlib, member prefix 'Divide_and_Conquer_EUR/' stripped, directories skipped",
+  "computed_at_utc": "2026-11-08",
+  "note": "Matches the v0.1 expectation of zero historical A-B-A. The 0.5.2-eur2085-eurex142 zip is a different profile and is excluded by design."
+}

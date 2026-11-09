@@ -1,0 +1,3 @@
+# keep fixture bytes exact (CRLF/LF matter for line-ending tests)
+fixtures/** -text
+* text=auto

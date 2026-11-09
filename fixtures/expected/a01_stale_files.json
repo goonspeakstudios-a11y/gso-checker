@@ -1,0 +1,20 @@
+{
+  "acceptance_id": "A01",
+  "release": "0.5.4e",
+  "repo_commit": "ae4f6169479656b79c37105b3c96c81ee8b5d2b7",
+  "stale_files": {
+    "script/eur40/eur40BattleHud.nut": {
+      "release_sha256": "793712b57fd9d887f0009de9dc9e088b994aca742261a398cf08876f1837f2a1",
+      "repo_sha256": "44d82eb834aaa7c7792cb47633a7c81f9c63ce7cf0b6e7c7997b2ecf4e8498b6"
+    },
+    "script/eur/campaign/aragornQuest.nut": {
+      "release_sha256": "f3f5f3bd15a433a1683636b69d0acad603a266c7800a5709acd98f16bcc9ff76",
+      "repo_sha256": "7a9469b1241db2a690c8cced9db5422a40bb0e5ac6aff3a2f52abc6271b3a35e"
+    }
+  },
+  "also_different_not_asserted": [
+    "script/eur/global_recruitment/eurGlobalRecruitment.nut"
+  ],
+  "computed_by": "same throwaway script as A02; values also match releases/releases.json key_file_sha256_inside_zip",
+  "note": "No repo history snapshot holds the release hashes, so the wording must be 'different from repo', never 'older'."
+}

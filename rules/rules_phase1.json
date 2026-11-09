@@ -1,0 +1,202 @@
+{
+  "catalog": "gso-checker phase 1 version-integrity rules",
+  "catalog_version": "1",
+  "rules": [
+    {
+      "id": "V01",
+      "version": "1",
+      "applies_to_profile": [
+        "EUREX-1.5"
+      ],
+      "selector": "every repo overlay file (minus repo.not_installed) vs composed release",
+      "predicate": "release has the path with sha256 equal to repo sha256",
+      "expected": "identical",
+      "severity": "blocking",
+      "authority": "policy",
+      "waivable": true,
+      "evidence": [
+        {
+          "file": "E:/GSO_checker_addendum_A/SPEC_v0.2.md",
+          "sha256": "4a70367ec279e18400c337b7223ea0478711b6bf817721fa7d63b56957114e61",
+          "date": "2026-11-08",
+          "line": "79",
+          "note": "V01 row: repo is the source of truth for required files (GSO author requirement)"
+        }
+      ],
+      "message": "{path}: release file is {classification} compared with repo."
+    },
+    {
+      "id": "V02",
+      "version": "1",
+      "applies_to_profile": [
+        "*"
+      ],
+      "selector": "every ZIP member of a release",
+      "predicate": "no duplicate member names; manifest records id, profile, packaging, path, size, sha256",
+      "expected": "unique members",
+      "severity": "blocking",
+      "authority": "policy",
+      "waivable": false,
+      "evidence": [
+        {
+          "file": "E:/GSO_checker_addendum_A/SPEC_v0.2.md",
+          "sha256": "4a70367ec279e18400c337b7223ea0478711b6bf817721fa7d63b56957114e61",
+          "date": "2026-11-08",
+          "line": "80",
+          "note": "V02 row"
+        },
+        {
+          "file": "E:/GSO_checker_addendum_A/SPEC_v0.2.md",
+          "sha256": "4a70367ec279e18400c337b7223ea0478711b6bf817721fa7d63b56957114e61",
+          "date": "2026-11-08",
+          "line": "58",
+          "note": "packaging normalization: reject duplicate destination names"
+        }
+      ],
+      "message": "{path}: duplicate archive member in release {release}."
+    },
+    {
+      "id": "V03",
+      "version": "1",
+      "applies_to_profile": [
+        "EUREX-1.5"
+      ],
+      "selector": "per profile + normalized path over ordered composed release manifests",
+      "predicate": "no release n whose hash equals an older release i while the release just before n differed",
+      "expected": "no A-B-A rollback",
+      "severity": "blocking",
+      "authority": "policy",
+      "waivable": true,
+      "evidence": [
+        {
+          "file": "E:/GSO_checker_addendum_A/SPEC_v0.2.md",
+          "sha256": "4a70367ec279e18400c337b7223ea0478711b6bf817721fa7d63b56957114e61",
+          "date": "2026-11-08",
+          "line": "81",
+          "note": "V03 row"
+        },
+        {
+          "file": "E:/GSO_checker_addendum_A/SPEC_v0.2.md",
+          "sha256": "4a70367ec279e18400c337b7223ea0478711b6bf817721fa7d63b56957114e61",
+          "date": "2026-11-08",
+          "line": "147",
+          "note": "gate check 3: known stale/rollback failures block by default"
+        }
+      ],
+      "message": "{path}: release {last} returns to the hash of {first} after {middle} changed it."
+    },
+    {
+      "id": "V04",
+      "version": "1",
+      "applies_to_profile": [
+        "EUREX-1.5"
+      ],
+      "selector": "every repo path present in the release",
+      "predicate": "release sha256 equals current repo sha256",
+      "expected": "current repo bytes",
+      "severity": "blocking",
+      "authority": "policy",
+      "waivable": true,
+      "evidence": [
+        {
+          "file": "E:/GSO_checker_addendum_A/SPEC_v0.2.md",
+          "sha256": "4a70367ec279e18400c337b7223ea0478711b6bf817721fa7d63b56957114e61",
+          "date": "2026-11-08",
+          "line": "82",
+          "note": "V04 row: say 'different from repo' unless a historical hash proves 'older'"
+        }
+      ],
+      "message": "{path}: release file is {wording}."
+    },
+    {
+      "id": "V05",
+      "version": "1",
+      "applies_to_profile": [
+        "EUREX-1.5"
+      ],
+      "selector": "live files under ownership.gso_owned globs",
+      "predicate": "path is in repo or in some stored manifest",
+      "expected": "tracked",
+      "severity": "info",
+      "authority": "policy",
+      "waivable": true,
+      "evidence": [
+        {
+          "file": "E:/GSO_checker_addendum_A/SPEC_v0.2.md",
+          "sha256": "4a70367ec279e18400c337b7223ea0478711b6bf817721fa7d63b56957114e61",
+          "date": "2026-11-08",
+          "line": "83",
+          "note": "V05 row: FAIL only if configured to block extras, otherwise INFO"
+        }
+      ],
+      "message": "{path}: live, not in repo, not in any manifest."
+    },
+    {
+      "id": "V06",
+      "version": "1",
+      "applies_to_profile": [
+        "EUREX-1.5"
+      ],
+      "selector": "release paths outside ownership.gso_owned that exist in the EUR baseline",
+      "predicate": "baseline bytes saved in a backup AND restorable by GSO_Uninstall.bat from GSO/originals",
+      "expected": "original saved and restorable",
+      "severity": "blocking",
+      "authority": "policy",
+      "waivable": false,
+      "evidence": [
+        {
+          "file": "E:/GSO_checker_addendum_A/SPEC_v0.2.md",
+          "sha256": "4a70367ec279e18400c337b7223ea0478711b6bf817721fa7d63b56957114e61",
+          "date": "2026-11-08",
+          "line": "84",
+          "note": "V06 row: UNKNOWN blocks install"
+        },
+        {
+          "file": "E:/GSO_checker_addendum_A/SPEC_v0.2.md",
+          "sha256": "4a70367ec279e18400c337b7223ea0478711b6bf817721fa7d63b56957114e61",
+          "date": "2026-11-08",
+          "line": "73",
+          "note": "waiver cannot suppress missing original needed for uninstall"
+        },
+        {
+          "file": "E:/GSO_checker_addendum_A/snapshots/snapshots.json",
+          "sha256": "8a7317f497e33d6f80c84e098ede2a5b0dd2003fea74eecda141620c4937269c",
+          "line": "pre_gso_eur_baseline_verdict",
+          "date": "2026-11-08",
+          "note": "no pre-GSO EUR baseline exists yet -> V06 UNKNOWN until one is configured"
+        }
+      ],
+      "message": "{path}: {state}."
+    },
+    {
+      "id": "V07",
+      "version": "1",
+      "applies_to_profile": [
+        "*"
+      ],
+      "selector": "every ZIP member of a release",
+      "predicate": "destination stays inside the install root and no two members collide case-insensitively",
+      "expected": "contained, collision-free",
+      "severity": "blocking",
+      "authority": "documented",
+      "waivable": false,
+      "evidence": [
+        {
+          "file": "E:/GSO_checker_addendum_A/SPEC_v0.2.md",
+          "sha256": "4a70367ec279e18400c337b7223ea0478711b6bf817721fa7d63b56957114e61",
+          "date": "2026-11-08",
+          "line": "85",
+          "note": "V07 row"
+        },
+        {
+          "file": "https://learn.microsoft.com/en-us/windows/wsl/case-sensitivity",
+          "sha256": "",
+          "line": "",
+          "date": "2026-11-08",
+          "note": "NTFS folders are case-insensitive by default (Windows documentation); ZIP traversal/absolute members escape the target"
+        }
+      ],
+      "message": "{path}: {problem}."
+    }
+  ]
+}

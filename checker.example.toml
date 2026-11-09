@@ -1,0 +1,119 @@
+# gso-checker configuration example. Copy to checker.toml (git-ignored) and edit.
+# All paths are read-only inputs EXCEPT data_dir and backups (checker-owned) and
+# live_mod, which only `install` / `uninstall` write after typed confirmation.
+# Use forward slashes. Relative paths resolve against this file's folder.
+
+[checker]
+data_dir = "C:/Users/BigBoss1/AppData/Local/gso-checker"   # checker.db + reports/
+profile  = "EUREX-1.5"                                     # profile everything is checked under
+rules    = "rules/rules_phase1.json"
+
+[profiles."EUREX-1.5"]
+description = "GSO on Divide and Conquer EUR / EUREX 1.5 with M2EX"
+
+[profiles."EUR-2.085-EUREX-1.4.2"]
+description = "History only: public 0.5.2 game-root package. Never mixed with EUREX-1.5."
+
+[game]
+root          = "D:/SteamLibrary/steamapps/common/Medieval II Total War"   # READ-ONLY for every command but install/uninstall
+exe           = "M2EX.exe"
+profile       = "EUREX-1.5"            # declared installation profile (gate check 'profile')
+mod_folder    = "Divide_and_Conquer_EUR"
+# live_mod    = "D:/.../mods/Divide_and_Conquer_EUR"   # default: <root>/mods/<mod_folder>
+process_names = ["M2EX.exe", "medieval2.exe", "kingdoms.exe"]
+
+[repo]
+overlay        = "E:/GSO_checker_addendum_A/repo/overlay_ae4f6169.zip"   # folder or git-archive zip
+overlay_prefix = "overlay/"                                              # stripped from zip members ("" for a folder)
+not_installed  = ["README.txt", "SHARED.txt"]                            # repo docs, never shipped
+tools          = ""                                                      # phase 2 (existing gates)
+
+[eur_baseline]
+path    = ""            # MISSING: no immutable pre-GSO EUR snapshot exists yet -> V06 UNKNOWN, install blocked
+profile = "EUREX-1.5"
+
+[backups]
+path = "E:/GSO_checker_backups"    # must be outside the game folder
+
+[ownership]
+# GSO-owned install-relative paths (V05 untracked-file scan; V06 treats everything else as possibly EUR-owned).
+gso_owned = [
+  "script/eur40/**",
+  "GSO/**",
+  "GSO_Uninstall.bat",
+  "GSO_Clean.bat",
+  "README_GSO.txt",
+  "eopData/images/eur40_*",
+  "eopData/sounds/eur40_*",
+]
+
+[policy]
+block_extras    = false     # V05: true -> untracked owned live files FAIL instead of INFO
+text_extensions = [".nut", ".txt", ".cfg", ".bat", ".json", ".lua", ".ini", ".xml", ".csv", ".md"]
+
+# Releases, OLDEST FIRST. packaging: full | patch. packaging_root: game-root | mod-root | mod-parent.
+# parent: composition parent, used only when packaging = "patch" (for full zips it is ignored).
+[[releases]]
+id = "0.5.2-eurex15"
+path = "E:/GSO_052/GSO_0.5.2_for_EUREX_1.5.zip"
+sha256 = "dcf11c8b31ec9ef7e408b5201a138d50c493a964daa8f09846567ada065b937b"
+profile = "EUREX-1.5"
+packaging = "full"
+packaging_root = "mod-parent"
+
+[[releases]]
+id = "0.5.3"
+path = "E:/GSO_053/GSO_0.5.3.zip"
+sha256 = "9d8d20398f69591eeb0ad58f62ca274c6ed66a790081fe667bbf2ea182950ca3"
+profile = "EUREX-1.5"
+packaging = "full"
+packaging_root = "mod-parent"
+
+[[releases]]
+id = "0.5.4"
+path = "E:/GSO_054/GSO_0.5.4.zip"
+sha256 = "b1797ae248e5dbc442ed62580edcc4d86c97c089c674eed5ab2b2c6b2c28eaad"
+profile = "EUREX-1.5"
+packaging = "full"
+packaging_root = "mod-parent"
+
+[[releases]]
+id = "0.5.4b"
+path = "E:/GSO_054/GSO_0.5.4b.zip"
+sha256 = "332a7a92e6dd0387f5dec31da24ca0ccc2edf4db7eafadbe63f2f0cd1f0367ef"
+profile = "EUREX-1.5"
+packaging = "full"
+packaging_root = "mod-parent"
+
+[[releases]]
+id = "0.5.4c"
+path = "E:/GSO_054/GSO_0.5.4c.zip"
+sha256 = "239f0ade9fd8bc18cfafbea373d8a5930a4a848263bd929201df8acffbeecdca"
+profile = "EUREX-1.5"
+packaging = "full"
+packaging_root = "mod-parent"
+
+[[releases]]
+id = "0.5.4d"
+path = "E:/GSO_054/GSO_0.5.4d.zip"
+sha256 = "35ed165a3367bc523083b5604858422492358a6410e6fdf3dad5acf49c292e61"
+profile = "EUREX-1.5"
+packaging = "full"
+packaging_root = "mod-parent"
+
+[[releases]]
+id = "0.5.4e"
+path = "E:/GSO_054/GSO_0.5.4e.zip"
+sha256 = "43ee024e4486a99021e3c86edb3b6e0c37758c87574dffceca0675850926f656"
+profile = "EUREX-1.5"
+packaging = "full"
+packaging_root = "mod-parent"
+
+# History only (different profile, game-root, 2.5 GB). Uncomment to inventory it; it is never compared with EUREX-1.5.
+# [[releases]]
+# id = "0.5.2-eur2085-eurex142"
+# path = "E:/GSO_052/GSO_0.5.2_for_EUR_2.085_EUREX_1.4.2.zip"
+# sha256 = "4553002681e849be6312cc2f21159e54f7edaba1bf826c984a76e6503ee9bf49"
+# profile = "EUR-2.085-EUREX-1.4.2"
+# packaging = "full"
+# packaging_root = "game-root"
