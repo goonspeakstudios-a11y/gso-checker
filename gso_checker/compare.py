@@ -158,6 +158,23 @@ def _v04(release: Manifest, repo_e: ManifestEntry, rel_e: ManifestEntry | None,
                   _src(release, rel_e), rel_e.sha256, checked_at, fp)]
 
 
+def _v04_history_input(past: Sequence[tuple[str, str, str]], repo_sha: str) -> str:
+    """V04 `history` cache input for ONE path key.
+
+    Only historical shas that differ from the current repo sha can change the
+    V04 outcome (equal to repo -> PASS; otherwise the release sha is matched
+    against the past). Snapshots holding the current repo sha are left out, so
+    recording a new repo snapshot after an edit to an UNRELATED file does not
+    change this path's fingerprint. For each remaining sha the latest snapshot id
+    and date are included because the 'older than repo' message names them.
+    """
+    latest: dict[str, tuple[str, str]] = {}
+    for snap, sha, recorded in past:
+        if sha != repo_sha:
+            latest[sha] = (snap, recorded[:10])
+    return memory.set_fingerprint([f"{sha}:{snap}:{day}" for sha, (snap, day) in latest.items()])
+
+
 def rule_v04(repo: Manifest, release: Manifest, history: Mapping[str, list[tuple[str, str, str]]],
              rule: RuleSpec, checked_at_utc: str, fingerprint: str, path_key: str) -> list[Finding]:
     """Stale-versus-repo for ONE path key present in repo (returns 0 or 1 finding).
@@ -414,7 +431,16 @@ def run_version_checks(cfg: Config, release_id: str, store: Store,
     than cfg.profile_id -> one UNKNOWN finding (rule V02, message 'profile
     mismatch') and no other rule runs. Records findings in the store.
     `command` only labels the stored findings run ('check' or 'compare').
+    All store writes of one run share a single transaction (Store.batch).
     """
+    with store.batch():
+        return _run_version_checks(cfg, release_id, store, rules, include_live=include_live,
+                                   command=command)
+
+
+def _run_version_checks(cfg: Config, release_id: str, store: Store,
+                        rules: Mapping[str, RuleSpec], *, include_live: bool,
+                        command: str) -> VersionCheckResult:
     now = utc_iso(_utcnow())
     profile = cfg.profile_id
     spec = release_by_id(cfg, release_id)
@@ -480,7 +506,7 @@ def run_version_checks(cfg: Config, release_id: str, store: Store,
                      lambda fp, re_=repo_e, rl=rel_e, r=v01: [_v01(repo, target, re_, rl, r, now, fp)])
         if v04 is not None and rule_applies(v04, profile):
             past = hist.get(key, [])
-            inputs = dict(base_inputs, history=memory.set_fingerprint([h[1] for h in past]))
+            inputs = dict(base_inputs, history=_v04_history_input(past, repo_e.sha256))
             run_unit(v04, key, inputs,
                      lambda fp, re_=repo_e, rl=rel_e, p=past, r=v04: _v04(target, re_, rl, p, r, now, fp))
 

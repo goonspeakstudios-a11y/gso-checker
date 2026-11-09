@@ -28,13 +28,14 @@ def _is_blocking_fail(item: ReviewedFinding) -> bool:
 
 def rollup(reviewed: Sequence[ReviewedFinding]) -> Verdict:
     """Spec section 2 roll-up: FAIL if any blocking, unwaived FAIL (a Waived status
-    only counts when the finding is waivable); else UNKNOWN if any blocking UNKNOWN;
-    else PASS. INFO never counts. Empty input -> UNKNOWN."""
+    only counts when the finding is waivable); else UNKNOWN if ANY UNKNOWN (an
+    UNKNOWN never rolls up to PASS, whatever its blocking flag); else PASS. INFO
+    never counts. Empty input -> UNKNOWN."""
     if not reviewed:
         return Verdict.UNKNOWN
     if any(_is_blocking_fail(r) for r in reviewed):
         return Verdict.FAIL
-    if any(r.finding.result is Verdict.UNKNOWN and r.finding.blocking for r in reviewed):
+    if any(r.finding.result is Verdict.UNKNOWN for r in reviewed):
         return Verdict.UNKNOWN
     return Verdict.PASS
 

@@ -177,7 +177,10 @@ runs `run_version_checks(include_live=True)` then checks in `CHECK_ORDER`:
 | mapping | every entry inside live_mod, no `@game/`, no V07 problem, live_mod inside game_root | FAIL |
 | waivers | every supplied waiver has reason + author | FAIL "waiver for <id> has no reason" |
 
-ALLOW only if every check is PASS (or waived). Any UNKNOWN blocks.
+ALLOW only if every check is PASS (or waived). Any UNKNOWN blocks. `manifest` also FAILs
+(not waivable) when a ZIP of the release chain does not match its declared `sha256`;
+`backup` is UNKNOWN when rule V06 is missing or inactive; `mapping` FAILs when
+`live_mod` is the game folder itself.
 
 ### 4.11 compare.py - orchestrators
 `run_version_checks(cfg, release_id, store, rules, *, include_live=True) -> VersionCheckResult`,
@@ -185,7 +188,8 @@ ALLOW only if every check is PASS (or waived). Any UNKNOWN blocks.
 `memory.evaluate_cached`; all inputs are re-hashed every run (cache never skips hashing).
 Manifests recorded with `store.record_manifest` (immutable). `run_check` attaches
 `memory.workflow_status` to each finding and sets `cached`/`rechecked` counts
-(counted per finding).
+(counted per finding). All store writes of one `run_version_checks` call share one
+transaction (`Store.batch()`; re-entrant, rollback on error).
 
 ### 4.12 installer.py (only writer under game_root)
 `install(cfg, release_id, *, confirm, probe, store, rules, waivers=())`:
@@ -196,7 +200,9 @@ confirm, probe, store)`: confirm must equal the install id; game must be NOT_RUN
 restore pre-existing files from the backup (verify sha256), delete files the install
 created, remove created dirs that are empty, verify EUR originals against the baseline
 if configured. Every write path passes `assert_inside(cfg.live_mod or cfg.backups, p)`.
-Install id: `inst-<YYYYMMDDTHHMMSSZ>-<release_id>`.
+Install id: `inst-<YYYYMMDDTHHMMSSZ>-<release_id>`. Before any write, the installer re-composes
+the release and refuses unless every (path, sha256, size, member, source release) equals the
+manifest the gate recorded; each copied byte string is hash-checked against that manifest.
 
 ### 4.13 report.py
 `rollup, count_line, ascii_safe, render_finding, render_text, render_json,
@@ -240,7 +246,7 @@ freshly hashed inputs, `"absent"`, or `set_fingerprint(...)` of a set. Units and
 | V01 | each repo path key | `release` = release sha or absent, `repo` = repo sha, `release_eol`, `repo_eol` (eol_sha256 or absent) |
 | V02, V07 | `""` (whole release) | `zip` = release ZIP sha256 (patch: every ZIP in the chain, `zip:<id>`) |
 | V03 | each path key present in the target | `seq` = set_fingerprint of `"<order>:<release_id>:<sha>"` over the same-profile releases up to the target |
-| V04 | each repo path key | `release`, `repo`, `history` = set_fingerprint of historical repo shas for that key (excluding the current snapshot) |
+| V04 | each repo path key | `release`, `repo`, `history` = set_fingerprint of `"<sha>:<latest snapshot id>:<date>"` over historical repo shas for that key, excluding the current snapshot AND every sha equal to the current repo sha (those cannot change the outcome; without this rule every new repo snapshot re-ran every V04 unit) |
 | V05 | `""` | `live` = set_fingerprint of `"<key>:<sha>"` over owned live files, `repo_keys` = set_fingerprint of repo keys, `known_keys` = set_fingerprint of stored manifest keys |
 | V06 | each candidate path key | `release` sha, `baseline` sha or `"not configured"`/absent, `backups` = set_fingerprint of `"<key>:<sha>"` over verified backup entries for that key, `uninstall` = sha of GSO_Uninstall.bat or absent, `original_src` = sha of the release's `GSO/originals/<path>` or absent |
 
@@ -264,7 +270,7 @@ stdout=None) -> int` (tests call it directly).
 
 | command | does | exit |
 |---|---|---|
-| `sources` | `resolve_sources`; one body line per input: `<present/MISSING> <name> | <path> | <kind> | mtime <..> | sha256 <..|-> | <note>` | 0 all present, 2 any missing |
+| `sources` | `resolve_sources`; one body line per input: `<present/MISSING> <name> | <path> | <kind> | mtime <..> | sha256 <..|-> | <note>` | 0 all phase-1 inputs present, 1 a ZIP does not match its declared sha256, 2 a phase-1 input missing. Phase-2-only inputs (`repo_tools`) show `not configured (phase 2)` and never change the exit code |
 | `compare --release ID` | `run_compare` | roll-up |
 | `check --release ID [--all]` | `run_check` (V01-V07); `--all` also lists PASS | roll-up |
 | `install-gate --release ID [--waivers FILE]` | `evaluate_gate`; waivers = FILE (JSON list of Waiver dicts) + valid Waived decisions in the store | 0 ALLOW, 3 REFUSE |
@@ -314,6 +320,7 @@ JSON = `render_json` (all Finding fields + status fields).
 - `install`/`uninstall` write only under `cfg.live_mod` and `cfg.backups`, only after
   the exact typed confirmation, only after the gate ALLOWs (install) or the probe says
   NOT_RUNNING (uninstall). Never M2EX/medieval2 executables, never outside the mod folder.
+- The CLI refuses (exit 3) a `data_dir`, reports folder or `sheet export --out` inside `game_root`.
 - Nothing launches, signals or kills a process. No network, no AI.
 
 ## 10. Decisions taken in phase 1 (not dictated by the spec)

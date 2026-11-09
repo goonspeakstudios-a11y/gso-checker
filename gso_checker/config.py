@@ -247,17 +247,6 @@ def _segment_regex(segment: str) -> "re.Pattern[str]":
     return re.compile("".join(parts))
 
 
-def _glob_segments(path: tuple[str, ...], pat: tuple[str, ...]) -> bool:
-    if not pat:
-        return not path
-    head = pat[0]
-    if head == "**":
-        return any(_glob_segments(path[i:], pat[1:]) for i in range(len(path) + 1))
-    if not path:
-        return False
-    return _segment_regex(head).fullmatch(path[0]) is not None and _glob_segments(path[1:], pat[1:])
-
-
 def match_glob(normalized_path: str, pattern: str) -> bool:
     """Case-insensitive glob on '/'-separated install-relative paths.
 
@@ -267,14 +256,32 @@ def match_glob(normalized_path: str, pattern: str) -> bool:
     'script/eur40/sub/b.nut' but not 'script/eur40x/a.nut';
     'eopData/sounds/eur40_*' matches 'EOPDATA/sounds/eur40_rain.wav'.
     """
-    pat_segs = tuple(pattern.replace("\\", "/").casefold().split("/"))
-    path_segs = tuple(normalized_path.replace("\\", "/").casefold().split("/"))
-    return _glob_segments(path_segs, pat_segs)
+    path = normalized_path.replace("\\", "/").casefold()
+    return _glob_regex(pattern.replace("\\", "/").casefold()).fullmatch(path + "/") is not None
+
+
+@lru_cache(maxsize=256)
+def _glob_regex(pattern: str) -> "re.Pattern[str]":
+    """One compiled regex per glob, matched against '<path>/'. Each plain segment
+    becomes '<seg>/' and '**' becomes '(?:[^/]*/)*' (zero or more whole segments),
+    so '*' and '?' never cross '/' and '**' may match nothing."""
+    parts = []
+    for seg in pattern.split("/"):
+        parts.append("(?:[^/]*/)*" if seg == "**" else _segment_regex(seg).pattern + "/")
+    return re.compile("".join(parts))
 
 
 def is_gso_owned(cfg: Config, normalized_path: str) -> bool:
     """True when normalized_path matches any cfg.gso_owned glob."""
     return any(match_glob(normalized_path, g) for g in cfg.gso_owned)
+
+
+PHASE2_REQUIRED_FOR: str = "phase 2 gates (optional)"
+
+
+def is_phase2_source(s: SourceStatus) -> bool:
+    """True for inputs used only by phase-2 commands (never block phase 1)."""
+    return s.required_for == PHASE2_REQUIRED_FOR
 
 
 def resolve_sources(cfg: Config) -> list[SourceStatus]:
@@ -285,14 +292,16 @@ def resolve_sources(cfg: Config) -> list[SourceStatus]:
     note 'sha256 matches declared' / 'sha256 MISMATCH declared <x>'),
     live_mod, game_root, game_exe (sha256), eur_baseline, backups, data_dir,
     rules. Unset optional inputs -> present False, kind 'unset', note
-    'not configured'. Never opens anything for writing.
+    'not configured' ('not configured (phase 2)' for phase-2-only inputs such
+    as repo_tools, see is_phase2_source). Never opens anything for writing.
     """
     out: list[SourceStatus] = []
 
     def add(name: str, p: Path | None, required_for: str, *, hash_file: bool = False,
             declared: str | None = None) -> None:
         if p is None:
-            out.append(SourceStatus(name, "", required_for, False, "unset", None, None, "not configured"))
+            note = "not configured (phase 2)" if required_for == PHASE2_REQUIRED_FOR else "not configured"
+            out.append(SourceStatus(name, "", required_for, False, "unset", None, None, note))
             return
         try:
             exists = p.exists()
@@ -323,7 +332,7 @@ def resolve_sources(cfg: Config) -> list[SourceStatus]:
         out.append(SourceStatus(name, str(p), required_for, True, kind, mtime, digest, note))
 
     add("repo_overlay", cfg.repo_overlay, "V01 V04 V05", hash_file=True)
-    add("repo_tools", cfg.repo_tools, "phase 2 gates")
+    add("repo_tools", cfg.repo_tools, PHASE2_REQUIRED_FOR)
     for spec in cfg.releases:
         add(f"release:{spec.release_id}", spec.path, "check compare install", hash_file=True,
             declared=spec.sha256)

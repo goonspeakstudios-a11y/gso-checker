@@ -165,6 +165,13 @@ def write_backup(cfg: Config, plan: InstallPlan, backup_id: str) -> Manifest:
 
 
 # ------------------------------------------------------------------ install
+def _content_key(m: Manifest) -> list[tuple[str, str, int, str, str]]:
+    """What the gate approved: every composed path with its sha256, size and the
+    ZIP member / release it comes from (patch chains included)."""
+    return sorted((e.normalized_path.casefold(), e.sha256, e.size, e.archive_member,
+                   e.source_release_id) for e in m.entries)
+
+
 def _release_sources(cfg: Config, release: Manifest, plan: InstallPlan) -> dict[str, ManifestEntry]:
     keyed = {e.normalized_path.casefold(): e for e in release.entries}
     return {p: keyed[p.casefold()] for p in plan.copies}
@@ -216,6 +223,9 @@ def install(cfg: Config, release_id: str, *, confirm: str, probe: ProcessProbe, 
         raise GateRefusedError(decision)
 
     release = composed_manifest(cfg, release_id, rules)
+    gated = store.get_manifest(release_id)
+    if gated is None or _content_key(gated) != _content_key(release):
+        raise CheckerError(f"release {release_id} changed after the gate evaluated it; nothing was changed")
     plan = plan_install(cfg, release)
     sources = _release_sources(cfg, release, plan)
     now_iso = model.utc_iso(model._utcnow())

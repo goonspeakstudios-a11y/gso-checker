@@ -79,6 +79,12 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _refuse_game_folder(cfg: config.Config, what: str, path: Path) -> None:
+    """The checker's own files (db, reports, sheets) never go under game_root."""
+    if gate.path_inside(cfg.game_root, path):
+        raise ConfigError(f"{what} {path} is inside the game folder {cfg.game_root}; refused")
+
+
 def _stamp() -> str:
     return _utcnow().strftime("%Y%m%dT%H%M%SZ")
 
@@ -132,11 +138,21 @@ def _sources(cfg: config.Config) -> Report:
     for s in rows:
         lines.append(f"{'present' if s.present else 'MISSING'} {s.name} | {s.path or '-'} | {s.kind} | "
                      f"mtime {s.mtime_utc or '-'} | sha256 {s.sha256 or '-'} | {s.note or '-'}")
-    missing = sum(1 for s in rows if not s.present)
-    reason = (f"All {len(rows)} configured inputs are present." if not missing else
-              f"{missing} of {len(rows)} configured inputs are missing or not configured.")
+    # Phase-2-only inputs (repo_tools) are listed but never affect the exit code.
+    missing = sum(1 for s in rows if not s.present and not config.is_phase2_source(s))
+    later = sum(1 for s in rows if not s.present and config.is_phase2_source(s))
+    mismatched = sum(1 for s in rows if s.note.startswith("sha256 MISMATCH"))
+    if mismatched:
+        reason = f"{mismatched} input(s) do not match their declared sha256."
+    elif missing:
+        reason = f"{missing} of {len(rows)} required inputs are missing or not configured."
+    else:
+        reason = f"All {len(rows) - later} phase-1 inputs are present."
+    if later:
+        reason += f" {later} phase-2 input(s) not configured yet."
+    code = EXIT_FAIL if mismatched else (EXIT_UNKNOWN if missing else EXIT_PASS)
     return Report("sources", cfg.profile_id, "-", None, reason, body_lines=tuple(lines),
-                  exit_code=EXIT_UNKNOWN if missing else EXIT_PASS)
+                  exit_code=code)
 
 
 def _sheet_export(cfg: config.Config, args: argparse.Namespace, store: Store, rules: dict) -> Report:
@@ -211,6 +227,10 @@ def main(argv: Sequence[str] | None = None, *, probe: ProcessProbe | None = None
     try:
         cfg = config.load_config(cfg_path)
         profile = cfg.profile_id
+        _refuse_game_folder(cfg, "data_dir", cfg.data_dir)
+        _refuse_game_folder(cfg, "reports folder", cfg.reports_dir)
+        if getattr(args, "out", None):
+            _refuse_game_folder(cfg, "--out", Path(args.out))
         store = Store(cfg.db_path)
         rep = _run(cfg, args, store, probe if probe is not None else SystemProcessProbe(), inp, out)
         show_pass = bool(getattr(args, "all", False))

@@ -11,7 +11,7 @@ from typing import Mapping, Sequence
 
 from gso_checker import model
 from gso_checker.compare import run_version_checks
-from gso_checker.config import Config, release_by_id
+from gso_checker.config import Config, release_by_id, rule_applies
 from gso_checker.manifest import GAME_SCOPE_PREFIX
 from gso_checker.model import (Finding, GateCheck, GateDecision, GateOutcome, Manifest,
                                ProcessInfo, ProcessObservation, ProcessState, Report, RuleSpec,
@@ -43,6 +43,11 @@ def _inside(root: Path, target: Path) -> bool:
         logger.warning("cannot resolve %s / %s: %s", root, target, exc)
         return False
     return len(t) >= len(r) and t[:len(r)] == r
+
+
+def path_inside(root: Path, target: Path) -> bool:
+    """Public form of the containment test (resolved, case-insensitive)."""
+    return _inside(root, target)
 
 
 def check_profile(cfg: Config, release_profile: str) -> GateCheck:
@@ -188,6 +193,8 @@ def check_mapping(cfg: Config, release: Manifest) -> GateCheck:
     bad: list[str] = []
     if not _inside(cfg.game_root, cfg.live_mod):
         bad.append(f"live mod folder {cfg.live_mod} is not inside game folder {cfg.game_root}")
+    elif _inside(cfg.live_mod, cfg.game_root):
+        bad.append(f"live mod folder {cfg.live_mod} is the game folder itself, not a mod folder")
     seen: dict[str, str] = {}
     for e in release.entries:
         p = e.normalized_path
@@ -225,6 +232,33 @@ def check_waivers(waivers: Sequence[Waiver]) -> GateCheck:
     return _check("waivers", Verdict.PASS, f"{len(waivers)} waiver(s), all with reason and author")
 
 
+def _chain(cfg: Config, release_id: str) -> list[str]:
+    ids = [release_id]
+    spec = release_by_id(cfg, release_id)
+    while spec.packaging.value == "patch" and spec.parent and spec.parent not in ids:
+        ids.append(spec.parent)
+        spec = release_by_id(cfg, spec.parent)
+    return ids
+
+
+def _with_integrity(cfg: Config, release_id: str, store: Store, check: GateCheck) -> GateCheck:
+    """Not waivable: every ZIP of the release chain must match its declared sha256
+    (when one is declared). The hashed value is the one recorded by this run."""
+    bad: list[str] = []
+    for rid in _chain(cfg, release_id):
+        declared = (release_by_id(cfg, rid).sha256 or "").lower()
+        stored = store.get_manifest(rid)
+        actual = stored.source_sha256 if stored is not None else None
+        if declared and actual != declared:
+            bad.append(f"{rid} ZIP sha256 {actual or 'unknown'} != declared {declared}")
+    if not bad:
+        return check
+    reason = "release ZIP integrity: " + "; ".join(bad)
+    if check.verdict is not Verdict.PASS:
+        reason += "; " + check.reason
+    return GateCheck("manifest", Verdict.FAIL, reason, False, False, check.finding_ids)
+
+
 def evaluate_gate(cfg: Config, release_id: str, *, probe: ProcessProbe, store: Store,
                   rules: Mapping[str, RuleSpec], waivers: Sequence[Waiver] = ()) -> GateDecision:
     """Run run_version_checks(include_live=True) then the six checks in
@@ -246,6 +280,11 @@ def evaluate_gate(cfg: Config, release_id: str, *, probe: ProcessProbe, store: S
         "mapping": check_mapping(cfg, result.release),
         "waivers": check_waivers(waivers),
     }
+    by_name["manifest"] = _with_integrity(cfg, release_id, store, by_name["manifest"])
+    v06 = rules.get("V06")
+    if (v06 is None or not rule_applies(v06, cfg.profile_id)) and by_name["backup"].verdict is Verdict.PASS:
+        by_name["backup"] = _check("backup", Verdict.UNKNOWN,
+                                   "rule V06 is not active for this profile; EUR originals unproven")
     checks = tuple(by_name[n] for n in CHECK_ORDER)
     allow = all(c.verdict is Verdict.PASS for c in checks)
     return GateDecision(release_id, cfg.profile_id, GateOutcome.ALLOW if allow else GateOutcome.REFUSE,

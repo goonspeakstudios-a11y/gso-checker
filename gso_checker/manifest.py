@@ -212,11 +212,14 @@ def build_tree_manifest(root: Path, *, release_id: str, kind: str, profile_id: s
     root = Path(root)
     entries: list[ManifestEntry] = []
     if root.is_dir():
-        for dirpath, dirnames, filenames in os.walk(root):
+        root_str = os.path.normpath(str(root))
+        for dirpath, dirnames, filenames in os.walk(root_str):
             dirnames.sort()
+            rel_dir = os.path.relpath(dirpath, root_str).replace("\\", "/")
+            rel_dir = "" if rel_dir == "." else rel_dir + "/"
             for fname in sorted(filenames):
-                full = Path(dirpath) / fname
-                rel = full.relative_to(root).as_posix()
+                full = os.path.join(dirpath, fname)
+                rel = rel_dir + fname
                 if include is not None and not include(rel):
                     continue
                 text = hashing.is_text_path(rel, text_extensions)

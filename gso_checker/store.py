@@ -10,9 +10,10 @@ import dataclasses
 import hashlib
 import json
 import logging
+import contextlib
 import sqlite3
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Iterator, Sequence
 
 from gso_checker import model
 from gso_checker.model import (CacheState, Finding, ImmutableRecordError, InstalledFile,
@@ -194,6 +195,34 @@ class Store:
         self._db.row_factory = sqlite3.Row
         self._db.executescript(SCHEMA_SQL)
         self._db.commit()
+        self._batch_depth = 0
+
+    @contextlib.contextmanager
+    def batch(self) -> Iterator["Store"]:
+        """Group many writes into ONE transaction (commit on clean exit,
+        rollback on error). Re-entrant: only the outermost batch commits.
+        Writes made outside a batch commit immediately, as before."""
+        self._batch_depth += 1
+        ok = False
+        try:
+            yield self
+            ok = True
+        finally:
+            self._batch_depth -= 1
+            if self._batch_depth == 0:
+                if ok:
+                    self._db.commit()
+                else:
+                    self._db.rollback()
+
+    @contextlib.contextmanager
+    def _tx(self) -> Iterator[None]:
+        """One write unit: its own transaction, or part of the open batch."""
+        if self._batch_depth > 0:
+            yield
+            return
+        with self._db:
+            yield
 
     def close(self) -> None:
         self._db.close()
@@ -204,7 +233,7 @@ class Store:
 
     # --- profiles / manifests -------------------------------------------------
     def ensure_profile(self, profile_id: str, description: str = "") -> None:
-        with self._db:
+        with self._tx():
             self._db.execute(
                 "INSERT OR IGNORE INTO profiles(profile_id, description, created_at_utc) "
                 "VALUES (?,?,?)", (profile_id, description, _now()))
@@ -222,7 +251,7 @@ class Store:
             raise ImmutableRecordError(
                 f"release {manifest.release_id} already recorded with different content")
         self.ensure_profile(manifest.profile_id)
-        with self._db:
+        with self._tx():
             self._db.execute(
                 "INSERT INTO releases(release_id, profile_id, kind, source_path, source_sha256,"
                 " content_fp, packaging, packaging_root, parent, ordinal, recorded_at_utc)"
@@ -280,7 +309,7 @@ class Store:
                                    for k in _FINDING_FIELDS], command, now))
         cols = ",".join(("run_id", *_FINDING_FIELDS, "command", "recorded_at_utc"))
         marks = ",".join("?" for _ in range(len(_FINDING_FIELDS) + 3))
-        with self._db:
+        with self._tx():
             self._db.executemany(f"INSERT OR REPLACE INTO findings({cols}) VALUES ({marks})", rows)
 
     def latest_finding(self, finding_id: str) -> Finding | None:
@@ -304,7 +333,7 @@ class Store:
                   dependency_fingerprint: str, findings: Sequence[Finding],
                   verified_at_utc: str) -> None:
         blob = json.dumps([finding_to_dict(f) for f in findings], sort_keys=True)
-        with self._db:
+        with self._tx():
             self._db.execute(
                 "INSERT OR REPLACE INTO cache(cache_key, rule_id, rule_version, profile_id,"
                 " dependency_fingerprint, findings_json, verified_at_utc) VALUES (?,?,?,?,?,?,?)",
@@ -313,7 +342,7 @@ class Store:
 
     # --- decisions --------------------------------------------------------------
     def add_decision(self, decision: ReviewDecision) -> None:
-        with self._db:
+        with self._tx():
             self._db.execute(
                 "INSERT INTO decisions(finding_id, source_sha256, rule_version,"
                 " dependency_fingerprint, status, reason, reviewer, reviewed_at, imported_from,"
@@ -339,7 +368,7 @@ class Store:
                             (record.install_id,)).fetchone() is not None:
             raise ImmutableRecordError(f"install {record.install_id} already recorded")
         now = _now()
-        with self._db:
+        with self._tx():
             self._db.execute(
                 "INSERT INTO installs(install_id, release_id, profile_id, target_root, backup_id,"
                 " backup_dir, installed_at_utc, status, post_check, record_json, updated_at_utc)"
@@ -349,7 +378,7 @@ class Store:
                  record.post_check.value, _install_to_json(record), now))
 
     def update_install_status(self, install_id: str, status: str, record: InstallRecord) -> None:
-        with self._db:
+        with self._tx():
             cur = self._db.execute(
                 "UPDATE installs SET status=?, record_json=?, updated_at_utc=? WHERE install_id=?",
                 (status, _install_to_json(dataclasses.replace(record, status=status)), _now(),
