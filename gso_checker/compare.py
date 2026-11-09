@@ -309,10 +309,15 @@ def _v06(release: Manifest, rel_e: ManifestEntry, rel_idx: Mapping[str, Manifest
         return mk(Verdict.INFO, "new file outside GSO-owned paths; not an EUR replacement",
                   rel_e.sha256, "absent from EUR baseline", blocking=False)
     orig = base_e.sha256
+    # the original counts as kept when a checker backup holds it OR the release ships it
+    # byte-identical under GSO/originals/ (a live mod already running GSO never yields
+    # EUR's bytes in an install backup; the release copy is what the uninstaller restores)
+    orig_src = rel_idx.get((ORIGINALS_PREFIX + path).casefold())
+    kept_in_release = orig_src is not None and orig_src.sha256 == orig
     problems: list[str] = []
     hard = False
-    if orig not in backup_shas:
-        problems.append("original not saved in backup")
+    if orig not in backup_shas and not kept_in_release:
+        problems.append("original not saved in backup or release GSO/originals")
         hard = True
     if uninstall_text is None:
         problems.append("GSO_Uninstall.bat not in release")
@@ -328,7 +333,7 @@ def _v06(release: Manifest, rel_e: ManifestEntry, rel_idx: Mapping[str, Manifest
             else:
                 problems.append("uninstall behavior not established statically")
     if not problems:
-        return mk(Verdict.PASS, "EUR original saved in backup and restored by uninstall",
+        return mk(Verdict.PASS, "EUR original kept (backup or release GSO/originals) and restored by uninstall",
                   rel_e.sha256, orig)
     return mk(Verdict.FAIL if hard else Verdict.UNKNOWN, "; ".join(problems), rel_e.sha256, orig)
 
@@ -345,14 +350,15 @@ def rule_v06(release: Manifest, baseline: Manifest | None, backups: Sequence[Man
       path absent from baseline -> INFO (blocking False) 'new file outside
                        GSO-owned paths; not an EUR replacement'.
       else orig = baseline sha256;
-        saved   := some backup manifest has this key with sha256 == orig;
+        saved   := some backup manifest has this key with sha256 == orig, OR the release
+                   ships GSO/originals/<path> with sha256 == orig (rule version 2);
         plan    := parse_uninstall_plan(uninstall_text) (uninstall_text None -> FAIL
                    'GSO_Uninstall.bat not in release');
         restorable := key in plan.restores and the release has
                    plan.restores[key] with sha256 == orig.
         Problems are collected separately, in this order, and joined with '; '
         into ONE finding (one finding per path keeps finding_id stable):
-          not saved                        -> 'original not saved in backup'
+          not saved                        -> 'original not saved in backup or release GSO/originals'
           not restorable, plan.understood  -> 'uninstall does not restore original'
           not restorable, not understood   -> 'uninstall behavior not established statically'
         any of the first two -> FAIL; only the third -> UNKNOWN; none -> PASS.

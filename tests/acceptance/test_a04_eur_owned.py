@@ -58,8 +58,9 @@ def test_a04_gate_blocks_on_v06_unknown(tmp_path: Path) -> None:
 
 
 def test_a04_each_failure_separately(tmp_path: Path) -> None:
-    """Baseline present, no backup of originals, uninstall script lacks the TATW.cfg restore:
-    TATW.cfg carries both failures, script/main.nut only the missing backup."""
+    """Baseline present, no checker backup, both originals shipped under GSO/originals, uninstall
+    script lacks the TATW.cfg restore: TATW.cfg fails on restoration only (its original is kept
+    by the release), script/main.nut passes."""
     w = build_world(tmp_path, backup=False)
     m = MOD + "/"
     bat = b"@echo off\r\ncopy /Y \"GSO\\originals\\script\\main.nut\" \"script\\main.nut\" >nul\r\n"
@@ -75,9 +76,7 @@ def test_a04_each_failure_separately(tmp_path: Path) -> None:
     v06 = {f.normalized_path: f for f in res.findings if f.rule_id == "V06"}
     tatw, main = v06["TATW.cfg"], v06["script/main.nut"]
     assert tatw.result is Verdict.FAIL
-    assert "original not saved in backup" in tatw.message
+    assert "original not saved" not in tatw.message
     assert "uninstall does not restore original" in tatw.message
-    assert main.result is Verdict.FAIL
-    assert "original not saved in backup" in main.message
-    assert "uninstall does not restore original" not in main.message
-    assert len([f for f in v06.values() if f.result is Verdict.FAIL]) == 2
+    assert main.result is Verdict.PASS
+    assert len([f for f in v06.values() if f.result is Verdict.FAIL]) == 1

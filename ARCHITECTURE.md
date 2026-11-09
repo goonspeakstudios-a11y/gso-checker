@@ -343,3 +343,7 @@ JSON = `render_json` (all Finding fields + status fields).
 16. Gate `profile` proof = declared `[game] profile` + exe present + configured baseline profile; no exe-hash identity in phase 1.
 17. Install backs up into `<backups>/<install_id>/`; the install id doubles as the backup id.
 18. Exit code 3 covers usage, config errors, confirmation mismatch and REFUSE.
+19. (2026-11-09, V06 rule version 2) "original kept" = the baseline sha256 found in a checker backup
+    OR shipped byte-identical under the release's `GSO/originals/`. A live mod already running GSO never
+    yields EUR's bytes in an install backup, so backups alone could never satisfy V06 on BB1's machine;
+    the release copy is exactly what `GSO_Uninstall.bat` restores. Restoration is still checked separately.

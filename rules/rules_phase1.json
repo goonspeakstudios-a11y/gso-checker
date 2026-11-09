@@ -133,12 +133,12 @@
     },
     {
       "id": "V06",
-      "version": "1",
+      "version": "2",
       "applies_to_profile": [
         "EUREX-1.5"
       ],
       "selector": "release paths outside ownership.gso_owned that exist in the EUR baseline",
-      "predicate": "baseline bytes saved in a backup AND restorable by GSO_Uninstall.bat from GSO/originals",
+      "predicate": "baseline bytes kept (in a checker backup OR byte-identical under the release's GSO/originals) AND restorable by GSO_Uninstall.bat from GSO/originals",
       "expected": "original saved and restorable",
       "severity": "blocking",
       "authority": "policy",
