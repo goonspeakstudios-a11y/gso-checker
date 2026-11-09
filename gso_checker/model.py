@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
+import hashlib
 from enum import Enum
 from pathlib import Path
 
@@ -395,12 +396,14 @@ def _utcnow() -> datetime:
 
     The ONLY clock in the package. Never datetime.utcnow().
     """
-    raise NotImplementedError
+    return datetime.now(timezone.utc)
 
 
 def utc_iso(dt: datetime) -> str:
     """Format an aware datetime as 'YYYY-MM-DDTHH:MM:SSZ' (UTC, no fraction)."""
-    raise NotImplementedError
+    if dt.tzinfo is None:
+        raise ValueError("utc_iso needs an aware datetime")
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def make_finding_id(rule_id: str, profile_id: str, input_id: str,
@@ -408,4 +411,6 @@ def make_finding_id(rule_id: str, profile_id: str, input_id: str,
     """Stable finding id: first 16 hex chars of sha256 over
     f"{rule_id}|{profile_id}|{input_id}|{normalized_path.casefold()}|{'' if line is None else line}"
     encoded UTF-8."""
-    raise NotImplementedError
+    key = "%s|%s|%s|%s|%s" % (rule_id, profile_id, input_id, normalized_path.casefold(),
+                                  "" if line is None else line)
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
